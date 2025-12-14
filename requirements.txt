@@ -1,0 +1,12 @@
+aiocron
+pymongo[srv]==4.3.3
+pymongo
+pyrofork
+TgCrypto-pyrofork
+pillow
+aiocron
+pillow
+pymongo[srv]==4.3.3
+pyrofork
+pyrogram
+TgCrypto-pyrofork

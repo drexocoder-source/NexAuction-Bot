@@ -345,6 +345,51 @@ async def add_team(bot, message):
         f"🏏 Ready for the auction floor!"
     )
 
+@Client.on_message(filters.command("rm_team") & filters.group)
+@co_owner
+async def remove_team(bot, message):
+    chat_id = resolve_chat_id(message.chat.id)
+
+    if message.reply_to_message:
+        user = message.reply_to_message.from_user
+        team = teams_col.find_one({
+            "chat_id": chat_id,
+            "owner_id": user.id
+        })
+        if not team:
+            return await message.reply("❌ No team found for this owner.")
+    else:
+        if len(message.command) < 2:
+            return await message.reply(
+                "⚠️ Usage:\n"
+                "`/rm_team Team Name`\n"
+                "or reply to owner with `/rm_team`"
+            )
+
+        team_name = " ".join(message.command[1:])
+        team = teams_col.find_one({
+            "chat_id": chat_id,
+            "team_name": team_name
+        })
+        if not team:
+            return await message.reply("❌ Team not found.")
+
+    # Optional safety: block removal if players already sold
+    if team.get("sold_players"):
+        return await message.reply(
+            "🚫 This team already has sold players.\n"
+            "Removal is blocked to protect auction integrity."
+        )
+
+    teams_col.delete_one({"_id": team["_id"]})
+
+    await message.reply(
+        f"🗑 **Team Removed Successfully**\n\n"
+        f"🧩 **Team:** {team['team_name']}\n"
+        f"👤 **Owner ID:** `{team['owner_id']}`\n\n"
+        f"⚖️ Auction data remains safe."
+    )
+
 
 @Client.on_message(filters.command("edit") & filters.group)
 @co_owner

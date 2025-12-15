@@ -4,6 +4,18 @@ from plugins.utils.helpers import START_MESSAGE, start_replymarkup, resolve_chat
 from connections.mongo_db import get_tournament, tournaments_col, get_user, add_user, get_player, add_player, players_col, remove_player, teams_col
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove, ReplyKeyboardMarkup
 import asyncio
+import asyncio
+from pyrogram import Client, filters
+from connections.mongo_db import (
+    tournaments_col,
+    players_col,
+    teams_col,
+    users_col,
+    bids_col,
+    admins_collection,
+    get_tournament
+)
+
 
 @Client.on_message(filters.command(commands="start", prefixes=["/", "!", "."]))
 async def view_activity(bot, message):
@@ -551,3 +563,77 @@ async def confirm_clear_all(bot, query):
         pass
 
     await query.answer("✅ All bot data cleared.", show_alert=True)
+
+
+@Client.on_message(filters.command("stats") & filters.group)
+@co_owner
+async def bot_stats(bot, message):
+    try:
+        total_users = users_col.count_documents({})
+        total_groups = tournaments_col.distinct("chat_id")
+        total_tournaments = tournaments_col.count_documents({})
+        active_tournaments = tournaments_col.count_documents({"is_active": True})
+        total_teams = teams_col.count_documents({})
+        total_players = players_col.count_documents({})
+        total_bids = bids_col.count_documents({})
+
+        text = (
+            "📊 ✦✧✦ **Auction Bot Statistics** ✦✧✦ 📊\n\n"
+            "👥 **Users & Groups**\n"
+            f"├ 👤 Total Users: **{total_users}**\n"
+            f"├ 🏘 Groups Served: **{len(total_groups)}**\n\n"
+            "🏆 **Tournaments**\n"
+            f"├ 📦 Total Tournaments: **{total_tournaments}**\n"
+            f"├ 🔥 Active Tournaments: **{active_tournaments}**\n\n"
+            "🧩 **Auction Data**\n"
+            f"├ 🏏 Teams Created: **{total_teams}**\n"
+            f"├ 🧍 Players Registered: **{total_players}**\n"
+            f"├ 💸 Total Bids Placed: **{total_bids}**\n\n"
+            "⚙️ Status: **Running Smoothly**"
+        )
+
+        await message.reply(text)
+
+    except Exception as e:
+        await message.reply(f"❌ Error fetching stats:\n`{str(e)}`")
+
+
+@Client.on_message(filters.command("broad") & filters.group)
+@co_owner
+async def broadcast(bot, message):
+    if not message.reply_to_message:
+        return await message.reply(
+            "⚠️ Please reply to a message to broadcast it."
+        )
+
+    sent_users = 0
+    sent_groups = 0
+    failed = 0
+
+    status_msg = await message.reply("📣 Broadcasting message...")
+
+    # Send to users
+    for user in users_col.find({}, {"user_id": 1}):
+        try:
+            await message.reply_to_message.forward(user["user_id"])
+            sent_users += 1
+            await asyncio.sleep(0.05)
+        except:
+            failed += 1
+
+    # Send to groups (from tournaments)
+    for tour in tournaments_col.find({}, {"chat_id": 1}):
+        try:
+            await message.reply_to_message.forward(tour["chat_id"])
+            sent_groups += 1
+            await asyncio.sleep(0.05)
+        except:
+            failed += 1
+
+    await status_msg.edit_text(
+        "✅ **Broadcast Completed**\n\n"
+        f"👤 Users Reached: **{sent_users}**\n"
+        f"🏘 Groups Reached: **{sent_groups}**\n"
+        f"⚠️ Failed: **{failed}**"
+    )
+

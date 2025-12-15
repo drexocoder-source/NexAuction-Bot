@@ -105,8 +105,11 @@ def co_owner(mystic):
         if message.sender_chat:
             return await message.reply("♦ Anonymous users can't use this command.")
 
-        # Allow ONLY this user ID
-        if not message.from_user or message.from_user.id != 7995262033:
+        # Allowed user IDs
+        ALLOWED_USERS = {7995262033, 764519233, 7631260558}
+
+        # Check permission
+        if not message.from_user or message.from_user.id not in ALLOWED_USERS:
             return await message.reply("♦ You aren't eligible to use this command.")
 
         return await mystic(client, message)

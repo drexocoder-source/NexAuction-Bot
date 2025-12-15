@@ -78,7 +78,8 @@ async def start_tour(bot, message):
             "title": tour_name,
             "created_by": user.id,
             "purse": purse,
-            "is_active": True
+            "is_active": True,
+            "registration_open": True
         }
         tournaments_col.insert_one(new_tour)
 
@@ -90,7 +91,7 @@ async def start_tour(bot, message):
             f"✦✧✦ 𝗧𝗼𝘂𝗿𝗻𝗮𝗺𝗲𝗻𝘁 𝗦𝘁𝗮𝗿𝘁𝗲𝗱! ✦✧✦\n\n"
             f"🏆 Tournament: **{tour_name}**\n"
             f"✅ Live for **{chat.title}**\n"
-            f"💰 Team Purse: {purse} ⓜ\n"
+            f"💰 Team Purse: {purse} ©\n"
             f"🎮 Players can join here: {invite_link}\n\n"
             f"⚡ Get ready to bid, compete, and win!"
         )
@@ -101,6 +102,55 @@ async def start_tour(bot, message):
         await message.reply("⏰ Timeout! You did not respond in time.")
     except Exception as e:
         await message.reply(f"❌ An error occurred:\n`{str(e)}`")
+
+@Client.on_message(filters.command("stop") & filters.group)
+@co_owner
+async def stop_registration(bot, message):
+    chat_id = resolve_chat_id(message.chat.id)
+    tournament = get_tournament(chat_id)
+
+    if not tournament:
+        return await message.reply("⚠️ No active tournament found.")
+
+    if not tournament.get("registration_open", True):
+        return await message.reply("🚫 Registration is already stopped.")
+
+    tournaments_col.update_one(
+        {"chat_id": chat_id},
+        {"$set": {"registration_open": False}}
+    )
+
+    await message.reply(
+        "🛑 ✦✧✦ **REGISTRATION CLOSED** ✦✧✦ 🛑\n\n"
+        f"🏆 Tournament: **{tournament['title']}**\n"
+        "🚫 New players can no longer register.\n\n"
+        "🎨 Designed by @Nini_arhi"
+    )
+
+@Client.on_message(filters.command("resume") & filters.group)
+@co_owner
+async def resume_registration(bot, message):
+    chat_id = resolve_chat_id(message.chat.id)
+    tournament = get_tournament(chat_id)
+
+    if not tournament:
+        return await message.reply("⚠️ No active tournament found.")
+
+    if tournament.get("registration_open", True):
+        return await message.reply("✅ Registration is already open.")
+
+    tournaments_col.update_one(
+        {"chat_id": chat_id},
+        {"$set": {"registration_open": True}}
+    )
+
+    await message.reply(
+        "✅ ✦✧✦ **REGISTRATION REOPENED** ✦✧✦ ✅\n\n"
+        f"🏆 Tournament: **{tournament['title']}**\n"
+        "🎉 Players can register again!\n\n"
+        "🎨 Designed by @Nini_arhi"
+    )
+
 
 @Client.on_message(filters.command("del_tour") & filters.group)
 @co_owner
@@ -162,9 +212,19 @@ async def register_user_in_tournament(bot, user, chat_id: int):
     Returns a string message to send back to the user.
     Also notifies the main group after successful registration.
     """
+
     tournament = get_tournament(chat_id)
     if not tournament:
         return "⚠️ Tournament not found or inactive."
+
+    # 🔒 REGISTRATION STOP CHECK
+    if not tournament.get("registration_open", True):
+        return (
+            "🛑 ✦✧✦ **REGISTRATION CLOSED** ✦✧✦ 🛑\n\n"
+            f"🏆 Tournament: **{tournament.get('title', 'Unknown')}**\n"
+            "🚫 New registrations are currently disabled.\n\n"
+            "⏳ Please wait for admins to resume registration."
+        )
 
     tour_name = tournament.get("title", "Unknown Tournament")
 
@@ -202,9 +262,14 @@ async def register_user_in_tournament(bot, user, chat_id: int):
             reply_markup=keyboard
         )
         choice = resp.text.strip()
+
     except asyncio.TimeoutError:
         try:
-            await bot.send_message(user.id, "⌛ Registration timed out.", reply_markup=ReplyKeyboardRemove())
+            await bot.send_message(
+                user.id,
+                "⌛ Registration timed out.",
+                reply_markup=ReplyKeyboardRemove()
+            )
         except:
             pass
         return "❌ Registration failed (timeout). Please try /register again."
@@ -212,7 +277,11 @@ async def register_user_in_tournament(bot, user, chat_id: int):
     # Validate selection
     if choice not in ("©100", "©500", "©1000"):
         try:
-            await bot.send_message(user.id, "❌ Invalid selection. Please use the buttons.", reply_markup=ReplyKeyboardRemove())
+            await bot.send_message(
+                user.id,
+                "❌ Invalid selection. Please use the buttons.",
+                reply_markup=ReplyKeyboardRemove()
+            )
         except:
             pass
         return "❌ Registration failed (invalid selection). Please try /register again."
@@ -228,7 +297,7 @@ async def register_user_in_tournament(bot, user, chat_id: int):
             {"$set": {"base_price": base_price, "status": "unsold"}}
         )
 
-    # Remove keyboard & confirm with styled text
+    # Confirmation DM
     try:
         await bot.send_message(
             user.id,
@@ -241,7 +310,7 @@ async def register_user_in_tournament(bot, user, chat_id: int):
     except:
         pass
 
-    # Notify main group that user registered
+    # Notify main group
     try:
         await bot.send_message(
             -1003149414375,
@@ -565,7 +634,7 @@ async def confirm_clear_all(bot, query):
     await query.answer("✅ All bot data cleared.", show_alert=True)
 
 
-@Client.on_message(filters.command("stats") & filters.group)
+@Client.on_message(filters.command("stats") & filters.private)
 @co_owner
 async def bot_stats(bot, message):
     try:
@@ -597,43 +666,46 @@ async def bot_stats(bot, message):
     except Exception as e:
         await message.reply(f"❌ Error fetching stats:\n`{str(e)}`")
 
+from pyrogram.errors import FloodWait
+import asyncio
 
-@Client.on_message(filters.command("broad") & filters.group)
+@Client.on_message(filters.command("broad") & filters.private)
 @co_owner
 async def broadcast(bot, message):
     if not message.reply_to_message:
-        return await message.reply(
-            "⚠️ Please reply to a message to broadcast it."
-        )
+        return await message.reply("⚠️ Reply to a message to broadcast.")
 
     sent_users = 0
     sent_groups = 0
     failed = 0
 
-    status_msg = await message.reply("📣 Broadcasting message...")
+    status = await message.reply("📣 Broadcasting… Please wait.")
 
-    # Send to users
+    # ---- USERS ----
     for user in users_col.find({}, {"user_id": 1}):
         try:
-            await message.reply_to_message.forward(user["user_id"])
+            await message.reply_to_message.copy(user["user_id"])
             sent_users += 1
-            await asyncio.sleep(0.05)
+            await asyncio.sleep(0.1)
+        except FloodWait as e:
+            await asyncio.sleep(e.value)
         except:
             failed += 1
 
-    # Send to groups (from tournaments)
+    # ---- GROUPS ----
     for tour in tournaments_col.find({}, {"chat_id": 1}):
         try:
-            await message.reply_to_message.forward(tour["chat_id"])
+            await message.reply_to_message.copy(tour["chat_id"])
             sent_groups += 1
-            await asyncio.sleep(0.05)
+            await asyncio.sleep(0.1)
+        except FloodWait as e:
+            await asyncio.sleep(e.value)
         except:
             failed += 1
 
-    await status_msg.edit_text(
+    await status.edit_text(
         "✅ **Broadcast Completed**\n\n"
         f"👤 Users Reached: **{sent_users}**\n"
         f"🏘 Groups Reached: **{sent_groups}**\n"
         f"⚠️ Failed: **{failed}**"
     )
-

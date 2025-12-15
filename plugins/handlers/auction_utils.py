@@ -3,6 +3,9 @@ from plugins.utils.admin_checker import co_owner, group_admin
 from connections.mongo_db import players_col, get_tournament, get_user, get_player, add_user, teams_col
 from plugins.utils.helpers import resolve_user, resolve_chat_id
 from config import Config
+import time
+TOP_COMMAND_COOLDOWN = {}
+TOP_COOLDOWN_SECONDS = 180  # 3 minutes
 
 def split_message(text, limit=4000):
     """Split text into chunks under Telegram's message limit"""
@@ -692,6 +695,164 @@ async def show_team_purses(bot, message):
 
     for chunk in split_message(text):
         await message.reply(chunk)
+
+@Client.on_message(filters.command("top") & filters.group)
+async def top_sales(bot, message):
+    chat_id = resolve_chat_id(message.chat.id)
+    user_id = message.from_user.id
+    now = time.time()
+
+    # ---- Cooldown Check ----
+    key = (chat_id, user_id)
+    last_used = TOP_COMMAND_COOLDOWN.get(key, 0)
+
+    remaining = TOP_COOLDOWN_SECONDS - (now - last_used)
+    if remaining > 0:
+        return await message.reply(
+            f"⏳ Please wait **{int(remaining)}s** before using /top again."
+        )
+
+    # Update cooldown
+    TOP_COMMAND_COOLDOWN[key] = now
+
+    tournament = get_tournament(chat_id)
+    if not tournament:
+        return await message.reply(
+            "⚠️ ✦✧✦ 𝗡𝗼 𝗔𝗰𝘁𝗶𝘃𝗲 𝗧𝗼𝘂𝗿𝗻𝗮𝗺𝗲𝗻𝘁 ✦✧✦ ⚠️"
+        )
+
+    # ---- Fetch Top 5 Sold Players ----
+    top_players = list(
+        players_col.find(
+            {
+                "chat_id": chat_id,
+                "status": "sold",
+                "sold_price": {"$ne": None}
+            }
+        )
+        .sort("sold_price", -1)
+        .limit(5)
+    )
+
+    if not top_players:
+        return await message.reply(
+            "⚠️ No players have been sold yet."
+        )
+
+    text = (
+        "🏆 ✦✧✦ **TOP 5 MOST EXPENSIVE BUYS** ✦✧✦ 🏆\n\n"
+        f"🏏 Tournament: **{tournament['title']}**\n\n"
+    )
+
+    for idx, p in enumerate(top_players, start=1):
+        user_info = get_user(p["user_id"])
+        name = (
+            user_info.get("full_name")
+            if user_info and user_info.get("full_name")
+            else f"User {p['user_id']}"
+        )
+
+        team_name = p.get("sold_to", "N/A")
+        price = p.get("sold_price", 0)
+
+        text += (
+            f"🥇 {idx}. **{name}**\n"
+            f"└ 💰 Sold For: **©{price:,}**\n"
+            f"└ 🏏 Team: **{team_name}**\n\n"
+        )
+
+    text += "🌺 Designed by @Nini_arhi"
+
+    await message.reply(text)
+
+@Client.on_message(filters.command("status") & filters.group)
+@co_owner
+async def tournament_status(bot, message):
+    chat_id = resolve_chat_id(message.chat.id)
+    tournament = get_tournament(chat_id)
+
+    if not tournament:
+        return await message.reply(
+            "⚠️ ✦✧✦ 𝗡𝗼 𝗔𝗰𝘁𝗶𝘃𝗲 𝗧𝗼𝘂𝗿𝗻𝗮𝗺𝗲𝗻𝘁 ✦✧✦ ⚠️"
+        )
+
+    players_count = players_col.count_documents({"chat_id": chat_id})
+    teams_count = teams_col.count_documents({"chat_id": chat_id})
+
+    reg_status = (
+        "🟢 OPEN" if tournament.get("registration_open", True) else "🔴 CLOSED"
+    )
+
+    text = (
+        "📊 ✦✧✦ **𝗧𝗢𝗨𝗥𝗡𝗔𝗠𝗘𝗡𝗧 𝗦𝗧𝗔𝗧𝗨𝗦** ✦✧✦ 📊\n\n"
+        f"🏆 Tournament: **{tournament['title']}**\n"
+        f"📩 Registration: **{reg_status}**\n"
+        f"👤 Players Registered: **{players_count}**\n"
+        f"🏏 Teams Created: **{teams_count}**\n"
+        f"💰 Team Purse: **©{tournament['purse']:,}**\n\n"
+        f"🎨 Designed by @Nini_arhi"
+    )
+
+    await message.reply(text)
+
+import csv
+import os
+
+@Client.on_message(filters.command("export") & filters.group)
+@co_owner
+async def export_data(bot, message):
+    args = message.text.split(maxsplit=1)
+    if len(args) != 2 or args[1].lower() not in ("players", "teams"):
+        return await message.reply(
+            "⚠️ Usage:\n"
+            "`/export players`\n"
+            "`/export teams`"
+        )
+
+    chat_id = resolve_chat_id(message.chat.id)
+    tournament = get_tournament(chat_id)
+    if not tournament:
+        return await message.reply("⚠️ No active tournament found.")
+
+    export_type = args[1].lower()
+
+    if export_type == "players":
+        filename = f"players_{chat_id}.csv"
+        fields = [
+            "user_id", "base_price", "status",
+            "sold_price", "sold_to"
+        ]
+        data = players_col.find({"chat_id": chat_id})
+
+    else:  # teams
+        filename = f"teams_{chat_id}.csv"
+        fields = [
+            "team_name", "owner_id",
+            "purse", "sold_players"
+        ]
+        data = teams_col.find({"chat_id": chat_id})
+
+    with open(filename, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=fields)
+        writer.writeheader()
+        for item in data:
+            row = {field: item.get(field, "") for field in fields}
+            writer.writerow(row)
+
+    await message.reply_document(
+        document=filename,
+        caption=(
+            f"📤 ✦✧✦ **EXPORT READY** ✦✧✦ 📤\n\n"
+            f"🏆 Tournament: **{tournament['title']}**\n"
+            f"📁 Data: **{export_type.capitalize()}**\n\n"
+            f"🎨 Designed by @Nini_arhi"
+        )
+    )
+
+    try:
+        os.remove(filename)
+    except:
+        pass
 
 # @Client.on_message(filters.private)
 # async def contactrobot(bot, message):

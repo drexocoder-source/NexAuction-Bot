@@ -15,10 +15,8 @@ def is_owner(user_id: int) -> bool:
     return user_id == OWNER_ID
 
 @Client.on_message(filters.command("list") & filters.group)
+@co_owner
 async def list_players(bot, message):
-    if not is_owner(message.from_user.id):
-        return await message.reply("🚫 This command is restricted to the bot owner.")
-
     chat_id = resolve_chat_id(message.chat.id)
     tournament = get_tournament(chat_id)
 
@@ -69,6 +67,7 @@ async def list_players(bot, message):
 
     for chunk in split_message(text):
         await message.reply(chunk)
+
 
 @Client.on_message(filters.command("unsold") & filters.group)
 async def unsold_players(bot, message):

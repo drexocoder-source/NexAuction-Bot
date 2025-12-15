@@ -90,6 +90,60 @@ async def start_tour(bot, message):
     except Exception as e:
         await message.reply(f"❌ An error occurred:\n`{str(e)}`")
 
+@Client.on_message(filters.command("del_tour") & filters.group)
+@co_owner
+async def del_tour(bot, message):
+    chat = message.chat
+    user = message.from_user
+
+    tournament = get_tournament(chat.id)
+    if not tournament:
+        return await message.reply(
+            "⚠️ No active tournament found in this group."
+        )
+
+    try:
+        # Confirmation step
+        confirm = await bot.ask(
+            chat_id=chat.id,
+            text=(
+                "🚨 **Tournament Deletion Warning** 🚨\n\n"
+                f"🏆 Tournament: **{tournament['title']}**\n\n"
+                "This will permanently delete:\n"
+                "• Tournament data\n"
+                "• Teams\n"
+                "• Players\n"
+                "• Auction history\n\n"
+                "Type **DELETE** to confirm.\n"
+                "Type anything else to cancel."
+            ),
+            user_id=user.id,
+            filters=filters.text,
+            timeout=60
+        )
+
+        if confirm.text.strip().upper() != "DELETE":
+            return await message.reply("❎ Tournament deletion cancelled.")
+
+        # Delete tournament
+        tournaments_col.delete_one({"chat_id": chat.id})
+
+        # Optional: clean related data
+        teams_col.delete_many({"chat_id": chat.id})
+        players_col.delete_many({"chat_id": chat.id})
+
+        await message.reply_text(
+            "🗑 **Tournament Deleted Successfully**\n\n"
+            "All related data has been removed.\n"
+            "You may now start a fresh tournament anytime."
+        )
+
+    except asyncio.TimeoutError:
+        await message.reply("⏰ Timeout! Deletion confirmation not received.")
+    except Exception as e:
+        await message.reply(f"❌ An error occurred:\n`{str(e)}`")
+
+
 async def register_user_in_tournament(bot, user, chat_id: int):
     """
     Core registration logic (used by both /start and callback).

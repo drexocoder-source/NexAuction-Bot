@@ -271,7 +271,6 @@ async def reset_player_cmd(bot, message):
         f"💰 Price refunded to **{team_name}**"
     )
 
-
 @Client.on_message(filters.command("add_team") & filters.group)
 @co_owner
 async def add_team(bot, message):
@@ -280,44 +279,130 @@ async def add_team(bot, message):
     if not tournament:
         return await message.reply("⚠️ No active tournament here.")
 
+    user = None
+    team_name = None
+    purse = tournament["purse"]  # default purse
+
+    def parse_team_and_purse(text: str):
+        if "|" in text:
+            name, purse_val = text.split("|", 1)
+            return name.strip(), int(purse_val.strip())
+        return text.strip(), purse
+
     if message.reply_to_message:
         user = message.reply_to_message.from_user
         if len(message.command) < 2:
-            return await message.reply("⚠️ Usage: Reply with /add_team {team_name}")
-        team_name = " ".join(message.command[1:])
+            return await message.reply(
+                "⚠️ Usage:\nReply with `/add_team Team Name | purse`"
+            )
+        team_name, purse = parse_team_and_purse(
+            " ".join(message.command[1:])
+        )
     else:
         if len(message.command) < 3:
-            return await message.reply("⚠️ Usage: /add_team {user_id/username} {team_name}")
+            return await message.reply(
+                "⚠️ Usage:\n/add_team user_id/username Team Name | purse"
+            )
 
         identifier = message.command[1]
         user = await resolve_user(bot, identifier)
         if not user:
             return await message.reply("❌ Could not resolve user.")
-        team_name = " ".join(message.command[2:])
 
-    existing = teams_col.find_one(
-        {"chat_id": chat_id, "$or": [{"team_name": team_name}, {"owner_id": user.id}]}
-    )
+        team_name, purse = parse_team_and_purse(
+            " ".join(message.command[2:])
+        )
+
+    if purse < 0:
+        return await message.reply("⚠️ Purse amount must be a positive number.")
+
+    existing = teams_col.find_one({
+        "chat_id": chat_id,
+        "$or": [
+            {"team_name": team_name},
+            {"owner_id": user.id}
+        ]
+    })
     if existing:
-        return await message.reply("⚠️ A team with this name or owner already exists in this tournament.")
+        return await message.reply(
+            "⚠️ A team with this name or owner already exists."
+        )
 
     new_team = {
         "chat_id": chat_id,
         "team_name": team_name,
         "owner_id": user.id,
         "bidder_list": [user.id],
-        "purse": tournament["purse"],
+        "purse": purse,
         "sold_players": []
     }
     teams_col.insert_one(new_team)
 
     await message.reply(
-        f"✨ 🎟 **Team Registered!** 🎟 ✨\n\n"
-        f"🧩 Team Name: **{team_name}**\n"
-        f"👤 Owner: {user.mention}\n"
-        f"💰 Starting Purse: {tournament['purse']:,} ©\n"
-        f"🎈 Have a great bidding! 🍷💓"
+        f"✨ 🎟 **Team Registered Successfully!** 🎟 ✨\n\n"
+        f"🧩 **Team:** {team_name}\n"
+        f"👤 **Owner:** {user.mention}\n"
+        f"💰 **Starting Purse:** {purse:,} ©\n\n"
+        f"🏏 Ready for the auction floor!"
     )
+
+
+@Client.on_message(filters.command("edit") & filters.group)
+@co_owner
+async def edit_team(bot, message):
+    chat_id = resolve_chat_id(message.chat.id)
+
+    if len(message.command) < 3:
+        return await message.reply(
+            "⚠️ Usage:\n"
+            "`/edit TeamName name NewName`\n"
+            "`/edit TeamName purse Amount`\n"
+            "`/edit TeamName name NewName | purse Amount`"
+        )
+
+    team_name = message.command[1]
+    team = teams_col.find_one({"chat_id": chat_id, "team_name": team_name})
+    if not team:
+        return await message.reply("❌ Team not found.")
+
+    update_data = {}
+    raw_text = " ".join(message.command[2:])
+
+    if "|" in raw_text:
+        parts = [p.strip() for p in raw_text.split("|")]
+    else:
+        parts = [raw_text]
+
+    for part in parts:
+        tokens = part.split(maxsplit=1)
+        if len(tokens) != 2:
+            continue
+
+        key, value = tokens
+        key = key.lower()
+
+        if key == "name":
+            update_data["team_name"] = value.strip()
+        elif key == "purse":
+            if not value.isdigit():
+                return await message.reply("⚠️ Purse must be a number.")
+            update_data["purse"] = int(value)
+
+    if not update_data:
+        return await message.reply("⚠️ Nothing to update.")
+
+    teams_col.update_one(
+        {"_id": team["_id"]},
+        {"$set": update_data}
+    )
+
+    text = "✏️ **Team Updated Successfully!**\n\n"
+    if "team_name" in update_data:
+        text += f"🧩 New Name: **{update_data['team_name']}**\n"
+    if "purse" in update_data:
+        text += f"💰 New Purse: **{update_data['purse']:,} ©**\n"
+
+    await message.reply(text)
 
 @Client.on_message(filters.command("team") & filters.group)
 async def fetch_team_players(bot, message):

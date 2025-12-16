@@ -233,7 +233,7 @@ async def register_user_in_tournament(bot, user, chat_id: int):
     if not db_user:
         add_user(user.id, user.username, user.first_name)
 
-    # Check if player exists in this tournament
+    # Check if already registered
     player = get_player(user.id, chat_id)
     if player and player.get("base_price"):
         return (
@@ -241,9 +241,12 @@ async def register_user_in_tournament(bot, user, chat_id: int):
             "🗑 If you want to deregister, use: /deregister"
         )
 
-    # Keyboard options for base price (only preset)
+    # 🎯 Base price keyboard (5 options)
     keyboard = ReplyKeyboardMarkup(
-        [["©100", "©500", "©1000"]],
+        [
+            ["©100", "©300", "©500"],
+            ["©1000", "©2000"]
+        ],
         one_time_keyboard=True,
         resize_keyboard=True
     )
@@ -251,10 +254,12 @@ async def register_user_in_tournament(bot, user, chat_id: int):
     try:
         prompt = (
             f"✨✦✧ 𝗖𝗵𝗼𝗼𝘀𝗲 𝗬𝗼𝘂𝗿 𝗕𝗮𝘀𝗲 𝗣𝗿𝗶𝗰𝗲 ✧✦✨\n\n"
-            f"💰 Tap a button to select your base price for **{tour_name}**:\n"
-            "• ©100  • ©500  • ©1000\n\n"
+            f"💰 Select your base price for **{tour_name}**:\n"
+            "• ©100  • ©300  • ©500\n"
+            "• ©1000 • ©2000\n\n"
             "🎨 Designed by @Nini_arhi"
         )
+
         resp = await bot.ask(
             user.id,
             prompt,
@@ -274,8 +279,8 @@ async def register_user_in_tournament(bot, user, chat_id: int):
             pass
         return "❌ Registration failed (timeout). Please try /register again."
 
-    # Validate selection
-    if choice not in ("©100", "©500", "©1000"):
+    # ✅ Validate selection
+    if choice not in ("©100", "©300", "©500", "©1000", "©2000"):
         try:
             await bot.send_message(
                 user.id,
@@ -303,7 +308,7 @@ async def register_user_in_tournament(bot, user, chat_id: int):
             user.id,
             f"✦✧✦ 𝗥𝗲𝗴𝗶𝘀𝘁𝗲𝗿𝗲𝗱! ✦✧✦\n\n"
             f"🎉 Welcome **{user.first_name}** to **{tour_name}**!\n"
-            f"💰 Base Price: ©{base_price}\n\n"
+            f"💰 Base Price: **©{base_price}**\n\n"
             f"🎨 Designed by @Nini_arhi",
             reply_markup=ReplyKeyboardRemove()
         )

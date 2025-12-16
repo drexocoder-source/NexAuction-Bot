@@ -17,9 +17,34 @@ OWNER_ID = 7995262033
 def is_owner(user_id: int) -> bool:
     return user_id == OWNER_ID
 
+def build_compact_player_list(players, title):
+    text = (
+        f"📋 ✦✧✦ 𝗣𝗹𝗮𝘆𝗲𝗿 𝗟𝗶𝘀𝘁 ✦✧✦ 📋\n\n"
+        f"🏆 **{title}**\n\n"
+    )
+
+    for idx, p in enumerate(players, start=1):
+        user_info = get_user(p["user_id"])
+        name = (
+            user_info.get("full_name")
+            if user_info and user_info.get("full_name")
+            else user_info.get("username")
+            if user_info and user_info.get("username")
+            else "Unknown"
+        )
+        base_price = p.get("base_price", "N/A")
+
+        text += (
+            f"{idx}. **{name}**  [`{p['user_id']}`]\n"
+            f"└ ©{base_price}\n\n"
+        )
+
+    text += "🎨 Designed by @Nini_arhi"
+    return text
+
 @Client.on_message(filters.command("list") & filters.group)
 @co_owner
-async def list_players(bot, message):
+async def list_players_group(bot, message):
     chat_id = resolve_chat_id(message.chat.id)
     tournament = get_tournament(chat_id)
 
@@ -34,42 +59,54 @@ async def list_players(bot, message):
             "⚠️ ✦✧✦ 𝗡𝗼 𝗣𝗹𝗮𝘆𝗲𝗿𝘀 𝗥𝗲𝗴𝗶𝘀𝘁𝗲𝗿𝗲𝗱 𝗬𝗲𝘁 ✦✧✦ ⚠️"
         )
 
-    text = (
-        f"📋 ✦✧✦ 𝗣𝗹𝗮𝘆𝗲𝗿 𝗟𝗶𝘀𝘁 ✦✧✦ 📋\n\n"
-        f"🏆 **{tournament['title']}**\n\n"
-    )
-
-    for idx, p in enumerate(players, start=1):
-        user_info = get_user(p["user_id"])
-        name = (
-            user_info.get("full_name")
-            if user_info and user_info.get("full_name")
-            else user_info.get("username")
-            if user_info and user_info.get("username")
-            else "Unknown Player"
-        )
-
-        base_price = p.get("base_price", "N/A")
-        status = p.get("status", "unsold").lower()
-
-        if status == "sold":
-            text += (
-                f"✦ **{idx}. {name}** ║ ツ [ `{p['user_id']}` ]\n"
-                f"└ 💰 Sold Price: ©{p.get('sold_price','N/A')}\n"
-                f"└ 🏏 Team: **{p.get('sold_to','N/A')}**\n"
-                f"└ ✅ Status: **Sold**\n\n"
-            )
-        else:
-            text += (
-                f"✦ **{idx}. {name}** ║ ツ [ `{p['user_id']}` ]\n"
-                f"└ 💸 Base Price: ©{base_price}\n"
-                f"└ ⏳ Status: **Unsold**\n\n"
-            )
-
-    text += "🎨 Designed by @Nini_arhi"
+    text = build_compact_player_list(players, tournament["title"])
 
     for chunk in split_message(text):
         await message.reply(chunk)
+        
+@Client.on_message(filters.command("list") & filters.private)
+@co_owner
+async def list_tournaments_dm(bot, message):
+    tournaments = list(tournaments_col.find({}))
+
+    if not tournaments:
+        return await message.reply("⚠️ No tournaments found.")
+
+    buttons = [
+        [InlineKeyboardButton(
+            text=t["title"],
+            callback_data=f"list_{t['chat_id']}"
+        )]
+        for t in tournaments
+    ]
+
+    await message.reply(
+        "🏆 ✦✧✦ 𝗦𝗲𝗹𝗲𝗰𝘁 𝗧𝗼𝘂𝗿𝗻𝗮𝗺𝗲𝗻𝘁 ✦✧✦ 🏆\n\n"
+        "Tap a tournament to view its player list:",
+        reply_markup=InlineKeyboardMarkup(buttons)
+    )
+
+@Client.on_callback_query(filters.regex(r"^list_"))
+@co_owner
+async def list_players_callback(bot, query):
+    chat_id = int(query.data.split("_", 1)[1])
+    tournament = get_tournament(chat_id)
+
+    if not tournament:
+        return await query.answer("Tournament not found.", show_alert=True)
+
+    players = list(players_col.find({"chat_id": chat_id}))
+    if not players:
+        return await query.message.reply(
+            "⚠️ No players registered in this tournament."
+        )
+
+    text = build_compact_player_list(players, tournament["title"])
+
+    for chunk in split_message(text):
+        await query.message.reply(chunk)
+
+    await query.answer()
 
 
 @Client.on_message(filters.command("unsold") & filters.group)

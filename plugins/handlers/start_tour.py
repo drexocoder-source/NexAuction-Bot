@@ -339,49 +339,67 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 # -------------------- GROUP COMMAND: REGISTER --------------------
 @Client.on_message(filters.command("register") & filters.group)
 async def group_reg(bot, message):
-    keyboard = InlineKeyboardMarkup(
-        [[InlineKeyboardButton("📩 𝗚𝗼 𝘁𝗼 𝗠𝘆 𝗗𝗠", url=f"https://t.me/{bot.me.username}?start=register")]]
-    )
     await message.reply(
-        "✨ 𝗥𝗲𝗴𝗶𝘀𝘁𝗲𝗿 𝗳𝗼𝗿 𝘁𝗼𝘂𝗿𝗻𝗮𝗺𝗲𝗻𝘁𝘀 𝗶𝗻 𝗣𝗥𝗜𝗩𝗔𝗧𝗘 𝗗𝗠 ✨\n\n"
-        "Click the button below to continue your registration 👇",
-        reply_markup=keyboard
+        "✨ **Tournament Registration** ✨\n\n"
+        "Players must register via **Private DM**.\n\n"
+        "👇 Click below to continue",
+        reply_markup=InlineKeyboardMarkup(
+            [[InlineKeyboardButton(
+                "📩 Go to Bot DM",
+                url=f"https://t.me/{bot.me.username}?start=register"
+            )]]
+        )
     )
 
 # -------------------- PRIVATE COMMAND: SHOW TOURNAMENTS --------------------
 @Client.on_message(filters.command("register") & filters.private)
 async def show_tournaments(bot, message):
-    tournaments = list(tournaments_col.find({"is_active": True}))
+    tournaments = list(
+        tournaments_col.find(
+            {"is_active": True},
+            {"chat_id": 1, "title": 1}
+        )
+    )
 
     if not tournaments:
         return await message.reply(
-            "⚠️ 𝗡𝗼 𝗮𝗰𝘁𝗶𝘃𝗲 𝘁𝗼𝘂𝗿𝗻𝗮𝗺𝗲𝗻𝘁𝘀 𝗿𝗶𝗴𝗵𝘁 𝗻𝗼𝘄.\n"
+            "⚠️ **No active tournaments right now.**\n\n"
             "⏳ Please check back later!"
         )
 
-    buttons = [[InlineKeyboardButton(text=t["title"], callback_data=f"reg_{t['chat_id']}")] for t in tournaments]
+    buttons = [
+        [InlineKeyboardButton(
+            text=f"🏆 {t['title']}",
+            callback_data=f"reg_{t['chat_id']}"
+        )]
+        for t in tournaments
+    ]
 
-    await message.reply_photo(
-        photo="assets/register.jpeg",
-        caption=(
-            "🏆 ✦✧✦ 𝗦𝗲𝗹𝗲𝗰𝘁 𝗮 𝗧𝗼𝘂𝗿𝗻𝗮𝗺𝗲𝗻𝘁 ✦✧✦ 🏆\n\n"
-            "Tap a tournament below to register:\n\n"
-            "🎨 Designed by @Nini_arhi"
-        ),
+    await message.reply(
+        "🏏 **Select a Tournament to Register**\n\n"
+        "Tap a tournament below 👇\n\n"
+        "🎨 Designed by @Nini_arhi",
         reply_markup=InlineKeyboardMarkup(buttons)
     )
+
 
 # -------------------- CALLBACK: REGISTER --------------------
 @Client.on_callback_query(filters.regex(r"^reg_"))
 async def handle_register_callback(bot, query):
+    await query.answer("⏳ Starting registration…", show_alert=False)
+
     try:
         chat_id = int(query.data.split("_", 1)[1])
     except ValueError:
-        return await query.answer("❌ Invalid tournament reference.", show_alert=True)
+        return await query.message.reply("❌ Invalid tournament reference.")
 
-    result = await register_user_in_tournament(bot, query.from_user, chat_id)
+    result = await register_user_in_tournament(
+        bot,
+        query.from_user,
+        chat_id
+    )
+
     await query.message.reply(result)
-    await query.answer("✅ Registration processed!")
 
 # -------------------- PRIVATE COMMAND: DEREGISTER --------------------
 @Client.on_message(filters.command("deregister") & filters.private)

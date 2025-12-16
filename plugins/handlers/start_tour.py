@@ -383,7 +383,6 @@ async def show_tournaments(bot, message):
     )
 
 
-# -------------------- CALLBACK: REGISTER --------------------
 @Client.on_callback_query(filters.regex(r"^reg_"))
 async def handle_register_callback(bot, query):
     await query.answer("⏳ Starting registration…", show_alert=False)
@@ -393,13 +392,11 @@ async def handle_register_callback(bot, query):
     except ValueError:
         return await query.message.reply("❌ Invalid tournament reference.")
 
-    result = await register_user_in_tournament(
+    await register_user_in_tournament(
         bot,
         query.from_user,
         chat_id
     )
-
-    await query.message.reply(result)
 
 # -------------------- PRIVATE COMMAND: DEREGISTER --------------------
 @Client.on_message(filters.command("deregister") & filters.private)

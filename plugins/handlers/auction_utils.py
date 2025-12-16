@@ -1,6 +1,6 @@
 from pyrogram import Client, filters
 from plugins.utils.admin_checker import co_owner, group_admin
-from connections.mongo_db import players_col, get_tournament, get_user, get_player, add_user, teams_col
+from connections.mongo_db import players_col, get_tournament, get_user, get_player, add_user, teams_col, tournaments_col
 from plugins.utils.helpers import resolve_user, resolve_chat_id
 from config import Config
 import time

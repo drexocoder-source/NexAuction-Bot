@@ -98,23 +98,55 @@ def group_admin(mystic):
         return await mystic(client, message)
     return wrapper
 
-def co_owner(mystic):
-    async def wrapper(client, message):
+from functools import wraps
+from pyrogram.types import Message, CallbackQuery
 
-        # Block anonymous admins
-        if message.sender_chat:
-            return await message.reply("♦ Anonymous users can't use this command.")
+def co_owner(mystic):
+    @wraps(mystic)
+    async def wrapper(client, update):
+
+        # -------- MESSAGE --------
+        if isinstance(update, Message):
+            message = update
+            user = message.from_user
+
+            # Block anonymous admins
+            if message.sender_chat:
+                return await message.reply("♦ Anonymous users can't use this command.")
+
+        # -------- CALLBACK QUERY --------
+        elif isinstance(update, CallbackQuery):
+            query = update
+            message = query.message
+            user = query.from_user
+
+        else:
+            return
 
         # Allowed user IDs
         ALLOWED_USERS = {7995262033, 764519233, 7631260558}
 
-        # Check permission
-        if not message.from_user or message.from_user.id not in ALLOWED_USERS:
-            return await message.reply("♦ You aren't eligible to use this command.")
+        # Permission check
+        if not user or user.id not in ALLOWED_USERS:
+            try:
+                if isinstance(update, CallbackQuery):
+                    return await query.answer(
+                        "♦ You aren't eligible to use this command.",
+                        show_alert=True
+                    )
+                else:
+                    return await message.reply(
+                        "♦ You aren't eligible to use this command."
+                    )
+            except:
+                pass
+            return
 
-        return await mystic(client, message)
+        # Call original function
+        return await mystic(client, update)
 
     return wrapper
+
 
 
 def group_admin_cq(mystic):

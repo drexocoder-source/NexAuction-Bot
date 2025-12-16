@@ -3,6 +3,29 @@ from plugins.utils.admin_checker import co_owner, group_admin
 from connections.mongo_db import players_col, get_tournament, get_user, get_player, add_user, teams_col, tournaments_col
 from plugins.utils.helpers import resolve_user, resolve_chat_id
 from config import Config
+import asyncio
+import time
+
+from pyrogram import Client, filters
+from pyrogram.types import (
+    InlineKeyboardMarkup,
+    InlineKeyboardButton,
+    ReplyKeyboardMarkup,
+    ReplyKeyboardRemove
+)
+
+from plugins.utils.admin_checker import co_owner
+from plugins.utils.helpers import resolve_chat_id
+
+from connections.mongo_db import (
+    tournaments_col,
+    players_col,
+    teams_col,
+    users_col,
+    get_tournament,
+    get_user
+)
+
 import time
 TOP_COMMAND_COOLDOWN = {}
 TOP_COOLDOWN_SECONDS = 180  # 3 minutes

@@ -177,51 +177,20 @@ async def unsold_players(bot, message):
     for chunk in split_message(text):
         await message.reply(chunk)
 
-@Client.on_message(filters.command("add_player") & filters.group)
-async def add_player_cmd(bot, message):
-    # ── Owner check ──
-    if not is_owner(message.from_user.id):
-        return await message.reply("🚫 This command is restricted to the bot owner.")
-
-    chat_id = resolve_chat_id(message.chat.id)
+async def add_player_to_tournament(bot, chat_id: int, target_user, base_price: int, executor):
     tournament = get_tournament(chat_id)
     if not tournament:
-        return await message.reply(
-            "⚠️ ✦✧✦ 𝗡𝗼 𝗔𝗰𝘁𝗶𝘃𝗲 𝗧𝗼𝘂𝗿𝗻𝗮𝗺𝗲𝗻𝘁 ✦✧✦ ⚠️"
-        )
+        return "⚠️ Tournament not found."
 
-    # ── Identify user & base price ──
-    if message.reply_to_message:
-        if len(message.command) < 2:
-            return await message.reply("⚠️ Usage: Reply with `/add_player <base_price>`")
-        try:
-            base_price = int(message.command[1])
-        except ValueError:
-            return await message.reply("❌ Invalid base price.")
-        user = message.reply_to_message.from_user
-    else:
-        if len(message.command) < 3:
-            return await message.reply("⚠️ Usage: `/add_player <user_id/username> <base_price>`")
-        identifier = message.command[1]
-        try:
-            base_price = int(message.command[2])
-        except ValueError:
-            return await message.reply("❌ Invalid base price.")
-        user = await resolve_user(bot, identifier)
-        if not user:
-            return await message.reply("❌ Could not resolve user.")
+    if get_player(target_user.id, chat_id):
+        return "⚠️ Player already registered in this tournament."
 
-    # ── Check if player already exists ──
-    if get_player(user.id, chat_id):
-        return await message.reply("⚠️ Player already registered in this tournament.")
+    # Ensure global user
+    if not get_user(target_user.id):
+        add_user(target_user.id, target_user.username, target_user.first_name)
 
-    # ── Ensure global user ──
-    if not get_user(user.id):
-        add_user(user.id, user.username, user.first_name)
-
-    # ── Insert player into tournament ──
     players_col.insert_one({
-        "user_id": user.id,
+        "user_id": target_user.id,
         "chat_id": chat_id,
         "base_price": base_price,
         "status": "unsold",
@@ -229,71 +198,208 @@ async def add_player_cmd(bot, message):
         "sold_price": None
     })
 
-    # ── Confirmation message ──
-    await message.reply(
-        f"✦✧✦ 𝗣𝗹𝗮𝘆𝗲𝗿 𝗔𝗱𝗱𝗲𝗱 ✦✧✦\n\n"
-        f"👤 **{user.first_name}** ║ ツ [ `{user.id}` ]\n"
-        f"└ 💸 Base Price: ©{base_price}\n"
-        f"└ 🏆 Tournament: **{tournament['title']}**\n\n"
-    )
-
-    # ── Log to main GC ──
+    # Log to main GC
     try:
         await bot.send_message(
             -1003149414375,
             f"➕ **Player Added**\n\n"
-            f"👤 {user.first_name} (`{user.id}`)\n"
+            f"👤 {target_user.first_name} (`{target_user.id}`)\n"
             f"💸 Base Price: ©{base_price}\n"
-            f"🏆 Tournament: **{tournament['title']}**\n"
+            f"🏆 {tournament['title']}\n"
+            f"👮 By: {executor.first_name}"
         )
     except:
         pass
 
-
-@Client.on_message(filters.command("remove_player") & filters.group)
-async def remove_player_cmd(bot, message):
-    if not is_owner(message.from_user.id):
-        return await message.reply("🚫 This command is restricted to the bot owner.")
-
-    chat_id = resolve_chat_id(message.chat.id)
-    tournament = get_tournament(chat_id)
-    if not tournament:
-        return await message.reply(
-            "⚠️ ✦✧✦ 𝗡𝗼 𝗔𝗰𝘁𝗶𝘃𝗲 𝗧𝗼𝘂𝗿𝗻𝗮𝗺𝗲𝗻𝘁 ✦✧✦ ⚠️"
-        )
-
-    if message.reply_to_message:
-        user = message.reply_to_message.from_user
-    else:
-        if len(message.command) < 2:
-            return await message.reply("⚠️ Usage: `/remove_player <user_id/username>`")
-        user = await resolve_user(bot, message.command[1])
-        if not user:
-            return await message.reply("❌ Could not resolve user.")
-
-    player = get_player(user.id, chat_id)
-    if not player:
-        return await message.reply("⚠️ Player not found in this tournament.")
-
-    players_col.delete_one({"user_id": user.id, "chat_id": chat_id})
-
-    await message.reply(
-        f"🗑 ✦✧✦ 𝗣𝗹𝗮𝘆𝗲𝗿 𝗥𝗲𝗺𝗼𝘃𝗲𝗱 ✦✧✦ 🗑\n\n"
-        f"👤 **{user.first_name}** ║ ツ [ `{user.id}` ]\n"
+    return (
+        f"✦✧✦ 𝗣𝗹𝗮𝘆𝗲𝗿 𝗔𝗱𝗱𝗲𝗱 ✦✧✦\n\n"
+        f"👤 **{target_user.first_name}** ║ ツ [ `{target_user.id}` ]\n"
+        f"💸 Base Price: ©{base_price}\n"
         f"🏆 Tournament: **{tournament['title']}**\n\n"
         f"🎨 Designed by @Nini_arhi"
     )
 
-    # ── Log to GC ──
+@Client.on_message(filters.command("add_player") & filters.group)
+@co_owner
+async def add_player_group(bot, message):
+    chat_id = resolve_chat_id(message.chat.id)
+
+    # ── Identify user & base price ──
+    if message.reply_to_message:
+        if len(message.command) < 2:
+            return await message.reply("⚠️ Reply with `/add_player <base_price>`")
+        try:
+            base_price = int(message.command[1])
+        except ValueError:
+            return await message.reply("❌ Invalid base price.")
+        target_user = message.reply_to_message.from_user
+    else:
+        if len(message.command) < 3:
+            return await message.reply("⚠️ `/add_player <user_id/username> <base_price>`")
+        target_user = await resolve_user(bot, message.command[1])
+        if not target_user:
+            return await message.reply("❌ Could not resolve user.")
+        try:
+            base_price = int(message.command[2])
+        except ValueError:
+            return await message.reply("❌ Invalid base price.")
+
+    text = await add_player_to_tournament(
+        bot, chat_id, target_user, base_price, message.from_user
+    )
+    await message.reply(text)
+
+@Client.on_message(filters.command("add_player") & filters.private)
+@co_owner
+async def add_player_dm(bot, message):
+    tournaments = list(tournaments_col.find({}))
+    if not tournaments:
+        return await message.reply("⚠️ No tournaments found.")
+
+    buttons = [
+        [InlineKeyboardButton(
+            t["title"],
+            callback_data=f"addp_tour_{t['chat_id']}"
+        )]
+        for t in tournaments
+    ]
+
+    await message.reply(
+        "🏆 **Select Tournament to Add Player**",
+        reply_markup=InlineKeyboardMarkup(buttons)
+    )
+@Client.on_callback_query(filters.regex(r"^addp_tour_"))
+@co_owner
+async def add_player_select_tournament(bot, query):
+    chat_id = int(query.data.split("_")[2])
+
+    await query.message.edit_text(
+        "👤 Send **username/user_id and base price**\n\n"
+        "Example:\n`@username 500`"
+    )
+
+    try:
+        reply = await bot.ask(
+            query.from_user.id,
+            "Enter: username base_price",
+            timeout=60
+        )
+    except asyncio.TimeoutError:
+        return await query.message.reply("⏰ Timed out.")
+
+    parts = reply.text.split()
+    if len(parts) != 2:
+        return await query.message.reply("❌ Invalid format.")
+
+    target_user = await resolve_user(bot, parts[0])
+    if not target_user:
+        return await query.message.reply("❌ User not found.")
+
+    try:
+        base_price = int(parts[1])
+    except ValueError:
+        return await query.message.reply("❌ Invalid base price.")
+
+    text = await add_player_to_tournament(
+        bot, chat_id, target_user, base_price, query.from_user
+    )
+
+    await query.message.reply(text)
+
+
+async def remove_player_from_tournament(bot, chat_id: int, target_user, executor):
+    tournament = get_tournament(chat_id)
+    if not tournament:
+        return "⚠️ Tournament not found."
+
+    player = players_col.find_one({"user_id": target_user.id, "chat_id": chat_id})
+    if not player:
+        return "⚠️ Player not found in this tournament."
+
+    players_col.delete_one({"user_id": target_user.id, "chat_id": chat_id})
+
+    # Log to main GC
     try:
         await bot.send_message(
             -1003149414375,
             f"➖ **Player Removed**\n\n"
-            f"👤 {user.first_name} (`{user.id}`)\n"
-            f"🏆 {tournament['title']}"
+            f"👤 {target_user.first_name} (`{target_user.id}`)\n"
+            f"🏆 {tournament['title']}\n"
+            f"👮 By: {executor.first_name}"
         )
     except:
         pass
+
+    return (
+        f"🗑 ✦✧✦ 𝗣𝗹𝗮𝘆𝗲𝗿 𝗥𝗲𝗺𝗼𝘃𝗲𝗱 ✦✧✦ 🗑\n\n"
+        f"👤 **{target_user.first_name}** ║ ツ [ `{target_user.id}` ]\n"
+        f"🏆 Tournament: **{tournament['title']}**\n\n"
+        f"🎨 Designed by @Nini_arhi"
+    )
+
+@Client.on_message(filters.command("remove") & filters.group)
+@co_owner
+async def remove_player_group(bot, message):
+    chat_id = resolve_chat_id(message.chat.id)
+
+    if not message.reply_to_message:
+        return await message.reply("⚠️ Reply to a player to remove them.")
+
+    target_user = message.reply_to_message.from_user
+    text = await remove_player_from_tournament(
+        bot, chat_id, target_user, message.from_user
+    )
+
+    await message.reply(text)
+
+@Client.on_message(filters.command("remove") & filters.private)
+@co_owner
+async def remove_player_dm(bot, message):
+    tournaments = list(tournaments_col.find({}))
+
+    if not tournaments:
+        return await message.reply("⚠️ No tournaments found.")
+
+    buttons = [
+        [InlineKeyboardButton(
+            t["title"],
+            callback_data=f"rm_tour_{t['chat_id']}"
+        )]
+        for t in tournaments
+    ]
+
+    await message.reply(
+        "🏆 **Select Tournament to Remove Player From**",
+        reply_markup=InlineKeyboardMarkup(buttons)
+    )
+
+@Client.on_callback_query(filters.regex(r"^rm_tour_"))
+@co_owner
+async def rm_select_tournament(bot, query):
+    chat_id = int(query.data.split("_")[2])
+
+    await query.message.edit_text(
+        "👤 Send **username / user_id** of the player to remove:"
+    )
+
+    try:
+        reply = await bot.ask(
+            query.from_user.id,
+            "Enter player username or user ID:",
+            timeout=60
+        )
+    except asyncio.TimeoutError:
+        return await query.message.reply("⏰ Timed out.")
+
+    target_user = await resolve_user(bot, reply.text)
+    if not target_user:
+        return await query.message.reply("❌ User not found.")
+
+    text = await remove_player_from_tournament(
+        bot, chat_id, target_user, query.from_user
+    )
+
+    await query.message.reply(text)
 
 
 

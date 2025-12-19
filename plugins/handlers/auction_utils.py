@@ -47,22 +47,21 @@ def build_compact_player_list(players, title):
     )
 
     for idx, p in enumerate(players, start=1):
-        user_info = get_user(p["user_id"])
-        name = (
-            user_info.get("full_name")
-            if user_info and user_info.get("full_name")
-            else user_info.get("username")
-            if user_info and user_info.get("username")
-            else "Unknown"
-        )
+        user_info = get_user(p["user_id"]) or {}
+
+        full_name = user_info.get("full_name", "Unknown")
+        username = user_info.get("username")
+
+        username_text = f"@{username}" if username else "No username"
         base_price = p.get("base_price", "N/A")
 
         text += (
-            f"{idx}. **{name}**  [`{p['user_id']}`]\n"
+            f"{idx}. **{full_name}**\n"
+            f"└ 👤 {username_text}\n"
+            f"└ 🆔 `{p['user_id']}`\n"
             f"└ ©{base_price}\n\n"
         )
 
-    text += "🎨 Designed by @Nini_arhi"
     return text
 
 @Client.on_message(filters.command("list") & filters.group)

@@ -124,7 +124,7 @@ def co_owner(mystic):
             return
 
         # Allowed user IDs
-        ALLOWED_USERS = {7995262033, 764519233, 7631260558}
+        ALLOWED_USERS = {7736589272, 7995262033, 764519233, 7631260558}
 
         # Permission check
         if not user or user.id not in ALLOWED_USERS:

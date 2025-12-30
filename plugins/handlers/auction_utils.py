@@ -35,7 +35,7 @@ def split_message(text, limit=4000):
     for i in range(0, len(text), limit):
         yield text[i:i+limit]
         
-OWNER_ID = 7995262033
+OWNER_ID = 7736589272
 
 def is_owner(user_id: int) -> bool:
     return user_id == OWNER_ID

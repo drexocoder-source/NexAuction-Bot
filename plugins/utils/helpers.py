@@ -176,7 +176,7 @@ async def send_sold_message(bot, chat_id: int, auction):
         f"🏷️ 𝚂𝚘𝚕𝚍 𝙿𝚛𝚒𝚌𝚎: {auction.current_bid} ©\n"
         f"👑 𝚃𝚎𝚊𝚖: {auction.leading_team}\n\n"
         f"🧩 𝑺𝒕𝒂𝒕𝒖𝒔 : *Sold*\n"
-        f"🌺 **<u>Made By:</u>** @Nini_arhi"
+        f"🌺 **<u>Made By:</u>** @Nexxxxxo_bots"
     )
 
     await bot.send_message(

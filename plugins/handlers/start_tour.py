@@ -124,7 +124,7 @@ async def stop_registration(bot, message):
         "🛑 ✦✧✦ **REGISTRATION CLOSED** ✦✧✦ 🛑\n\n"
         f"🏆 Tournament: **{tournament['title']}**\n"
         "🚫 New players can no longer register.\n\n"
-        "🎨 Designed by @Nini_arhi"
+        "🎨 Designed by @Nexxxxxo_bots"
     )
 
 @Client.on_message(filters.command("resume") & filters.group)
@@ -148,7 +148,7 @@ async def resume_registration(bot, message):
         "✅ ✦✧✦ **REGISTRATION REOPENED** ✦✧✦ ✅\n\n"
         f"🏆 Tournament: **{tournament['title']}**\n"
         "🎉 Players can register again!\n\n"
-        "🎨 Designed by @Nini_arhi"
+        "🎨 Designed by @Nexxxxxo_bots"
     )
 
 
@@ -257,7 +257,7 @@ async def register_user_in_tournament(bot, user, chat_id: int):
             f"💰 Select your base price for **{tour_name}**:\n"
             "• ©100  • ©300  • ©500\n"
             "• ©1000 • ©2000\n\n"
-            "🎨 Designed by @Nini_arhi"
+            "🎨 Designed by @Nexxxxxo_bots"
         )
 
         resp = await bot.ask(
@@ -309,7 +309,7 @@ async def register_user_in_tournament(bot, user, chat_id: int):
             f"✦✧✦ 𝗥𝗲𝗴𝗶𝘀𝘁𝗲𝗿𝗲𝗱! ✦✧✦\n\n"
             f"🎉 Welcome **{user.first_name}** to **{tour_name}**!\n"
             f"💰 Base Price: **©{base_price}**\n\n"
-            f"🎨 Designed by @Nini_arhi",
+            f"🎨 Designed by @Nexxxxxo_bots",
             reply_markup=ReplyKeyboardRemove()
         )
     except:
@@ -322,7 +322,7 @@ async def register_user_in_tournament(bot, user, chat_id: int):
             f"💫 New Registration Alert 💫\n\n"
             f"👤 **{user.first_name}** has registered in **{tour_name}**!\n"
             f"💰 Base Price: ©{base_price}\n"
-            f"🎨 Designed by @Nini_arhi"
+            f"🎨 Designed by @Nexxxxxo_bots"
         )
     except:
         pass
@@ -331,7 +331,7 @@ async def register_user_in_tournament(bot, user, chat_id: int):
         f"✦✧✦ 𝗥𝗲𝗴𝗶𝘀𝘁𝗲𝗿𝗲𝗱! ✦✧✦\n\n"
         f"🎉 Welcome **{user.first_name}** to **{tour_name}**\n"
         f"💰 Base Price: **©{base_price}**\n\n"
-        f"🎨 Designed by @Nini_arhi"
+        f"🎨 Designed by @Nexxxxxo_bots"
     )
 
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton

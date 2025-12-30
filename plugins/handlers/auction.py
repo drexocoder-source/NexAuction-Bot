@@ -73,7 +73,7 @@ PFP_CACHE = {}  # global cache
 
 @Client.on_message(filters.command("auctionstart", prefixes=["/", ".", "!"]) & filters.group)
 async def auctionstart(bot, message):
-    owner_id = 7995262033
+    owner_id = 7736589272
     if message.from_user.id != owner_id:
         return await message.reply("❌ Only the owner can start an auction.")
 

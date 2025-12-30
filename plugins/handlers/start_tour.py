@@ -318,7 +318,7 @@ async def register_user_in_tournament(bot, user, chat_id: int):
     # Notify main group
     try:
         await bot.send_message(
-            -1003149414375,
+            -1003640029768,
             f"💫 New Registration Alert 💫\n\n"
             f"👤 **{user.first_name}** has registered in **{tour_name}**!\n"
             f"💰 Base Price: ©{base_price}\n"

@@ -778,7 +778,6 @@ async def remove_bidder(bot, message):
     )
 
 @Client.on_message(filters.command("info") & filters.group)
-@group_admin
 async def get_player_info(bot, message):
     args = message.text.split()
     chat_id = resolve_chat_id(message.chat.id)
